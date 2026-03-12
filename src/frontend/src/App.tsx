@@ -1,6 +1,7 @@
 import { Toaster } from "@/components/ui/sonner";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
+import AnnouncementPopup from "./components/AnnouncementPopup";
 import Footer from "./components/Footer";
 import Navbar from "./components/Navbar";
 import AdminPage from "./pages/AdminPage";
@@ -44,6 +45,7 @@ function AppContent() {
       <div className="flex-1">{renderPage()}</div>
       <Footer />
       <Toaster richColors position="top-right" />
+      <AnnouncementPopup />
     </div>
   );
 }

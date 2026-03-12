@@ -28,6 +28,9 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  Bell,
+  BellOff,
+  BellRing,
   CheckCircle,
   Eye,
   EyeOff,
@@ -35,13 +38,20 @@ import {
   Loader2,
   Lock,
   MessageSquare,
+  Pencil,
   Settings,
+  Trash2,
   UserPlus,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
 import { toast } from "sonner";
 import type { SupportTicket } from "../backend";
+import type { Announcement } from "../components/AnnouncementPopup";
+import {
+  getAnnouncements,
+  saveAnnouncements,
+} from "../components/AnnouncementPopup";
 import {
   IssueType,
   TicketStatus,
@@ -737,6 +747,255 @@ function SettingsPanel() {
   );
 }
 
+function AnnouncementsPanel() {
+  const [announcements, setAnnouncements] = useState<Announcement[]>(() =>
+    getAnnouncements(),
+  );
+  const [title, setTitle] = useState("");
+  const [message, setMessage] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editMessage, setEditMessage] = useState("");
+
+  const persist = (list: Announcement[]) => {
+    saveAnnouncements(list);
+    setAnnouncements(list);
+  };
+
+  const handleAdd = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title.trim() || !message.trim()) return;
+    const newItem: Announcement = {
+      id: `ann_${Date.now()}`,
+      title: title.trim(),
+      message: message.trim(),
+      date: new Date().toISOString(),
+      active: true,
+    };
+    persist([newItem, ...announcements]);
+    setTitle("");
+    setMessage("");
+    toast.success("Announcement created!");
+  };
+
+  const handleToggle = (id: string) => {
+    persist(
+      announcements.map((a) => (a.id === id ? { ...a, active: !a.active } : a)),
+    );
+  };
+
+  const handleDelete = (id: string) => {
+    persist(announcements.filter((a) => a.id !== id));
+    toast.success("Announcement deleted.");
+  };
+
+  const startEdit = (a: Announcement) => {
+    setEditingId(a.id);
+    setEditTitle(a.title);
+    setEditMessage(a.message);
+  };
+
+  const saveEdit = () => {
+    if (!editTitle.trim() || !editMessage.trim()) return;
+    persist(
+      announcements.map((a) =>
+        a.id === editingId
+          ? { ...a, title: editTitle.trim(), message: editMessage.trim() }
+          : a,
+      ),
+    );
+    setEditingId(null);
+    toast.success("Announcement updated!");
+  };
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      {/* Create form */}
+      <Card className="rounded-2xl border-0 shadow-card">
+        <CardHeader className="pb-4">
+          <CardTitle className="font-display text-lg flex items-center gap-2">
+            <Bell size={18} className="text-primary" />
+            New Announcement
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Active announcements are shown as a popup to all site visitors.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleAdd} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="ann-title">Title</Label>
+              <Input
+                id="ann-title"
+                placeholder="e.g. New Feature Launch 🎉"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="rounded-xl h-11"
+                data-ocid="admin.announcement_title_input"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="ann-message">Message</Label>
+              <Textarea
+                id="ann-message"
+                placeholder="Write your announcement message..."
+                rows={4}
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                className="rounded-xl resize-none"
+                data-ocid="admin.announcement_message_textarea"
+              />
+            </div>
+            <Button
+              type="submit"
+              disabled={!title.trim() || !message.trim()}
+              className="w-full rounded-xl bg-primary text-primary-foreground"
+              data-ocid="admin.add_announcement_button"
+            >
+              <Bell size={14} className="mr-2" />
+              Publish Announcement
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* List */}
+      <div className="space-y-3">
+        <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">
+          All Announcements ({announcements.length})
+        </h3>
+
+        {announcements.length === 0 ? (
+          <div
+            className="text-center py-12 text-muted-foreground text-sm"
+            data-ocid="admin.announcements_empty_state"
+          >
+            No announcements yet. Create one to display a popup on your site.
+          </div>
+        ) : (
+          announcements.map((a, i) => (
+            <Card
+              key={a.id}
+              className={`rounded-2xl border shadow-soft transition-colors ${
+                a.active ? "border-primary/20 bg-primary/5" : "border-border"
+              }`}
+              data-ocid={`admin.announcement_item.${i + 1}`}
+            >
+              <CardContent className="p-4">
+                {editingId === a.id ? (
+                  <div className="space-y-3">
+                    <Input
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      className="rounded-xl h-10 text-sm"
+                      placeholder="Title"
+                    />
+                    <Textarea
+                      value={editMessage}
+                      onChange={(e) => setEditMessage(e.target.value)}
+                      rows={3}
+                      className="rounded-xl resize-none text-sm"
+                      placeholder="Message"
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        className="rounded-lg bg-primary text-primary-foreground"
+                        onClick={saveEdit}
+                        disabled={!editTitle.trim() || !editMessage.trim()}
+                        data-ocid={`admin.announcement_save_button.${i + 1}`}
+                      >
+                        Save
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="rounded-lg"
+                        onClick={() => setEditingId(null)}
+                        data-ocid={`admin.announcement_cancel_button.${i + 1}`}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="font-semibold text-sm truncate">
+                            {a.title}
+                          </p>
+                          <Badge
+                            className={`text-xs px-2 py-0.5 rounded-full border-0 shrink-0 ${
+                              a.active
+                                ? "bg-green-100 text-green-700"
+                                : "bg-gray-100 text-gray-500"
+                            }`}
+                          >
+                            {a.active ? "Active" : "Inactive"}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground line-clamp-2">
+                          {a.message}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {new Date(a.date).toLocaleDateString("en-IN", {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => handleToggle(a.id)}
+                        className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors ${
+                          a.active
+                            ? "bg-green-100 text-green-700 hover:bg-green-200"
+                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                        }`}
+                        data-ocid={`admin.announcement_toggle.${i + 1}`}
+                      >
+                        {a.active ? (
+                          <BellRing size={12} />
+                        ) : (
+                          <BellOff size={12} />
+                        )}
+                        {a.active ? "Deactivate" : "Activate"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => startEdit(a)}
+                        className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground transition-colors"
+                        data-ocid={`admin.announcement_edit_button.${i + 1}`}
+                      >
+                        <Pencil size={12} />
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(a.id)}
+                        className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-destructive/10 hover:bg-destructive/20 text-destructive transition-colors"
+                        data-ocid={`admin.announcement_delete_button.${i + 1}`}
+                      >
+                        <Trash2 size={12} />
+                        Delete
+                      </button>
+                    </div>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const [unlocked, setUnlocked] = useState(
     () => sessionStorage.getItem("admin_auth") === "1",
@@ -776,7 +1035,7 @@ export default function AdminPage() {
           </div>
 
           <Tabs defaultValue="tickets">
-            <TabsList className="rounded-2xl bg-muted/60 p-1 mb-8 h-auto">
+            <TabsList className="rounded-2xl bg-muted/60 p-1 mb-8 h-auto flex-wrap gap-1">
               <TabsTrigger
                 value="tickets"
                 className="rounded-xl px-6 py-2.5 font-medium data-[state=active]:bg-background data-[state=active]:shadow-soft"
@@ -799,6 +1058,14 @@ export default function AdminPage() {
                 <Settings size={14} className="mr-2" />
                 Settings
               </TabsTrigger>
+              <TabsTrigger
+                value="announcements"
+                className="rounded-xl px-6 py-2.5 font-medium data-[state=active]:bg-background data-[state=active]:shadow-soft"
+                data-ocid="admin.announcements_tab"
+              >
+                <Bell size={14} className="mr-2" />
+                Announcements
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="tickets">
@@ -811,6 +1078,10 @@ export default function AdminPage() {
 
             <TabsContent value="settings">
               <SettingsPanel />
+            </TabsContent>
+
+            <TabsContent value="announcements">
+              <AnnouncementsPanel />
             </TabsContent>
           </Tabs>
         </motion.div>
