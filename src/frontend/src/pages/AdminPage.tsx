@@ -27,7 +27,17 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Lock, MessageSquare, UserPlus } from "lucide-react";
+import {
+  CheckCircle,
+  Eye,
+  EyeOff,
+  KeyRound,
+  Loader2,
+  Lock,
+  MessageSquare,
+  Settings,
+  UserPlus,
+} from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -42,7 +52,12 @@ import {
   useUpdateTicketStatus,
 } from "../hooks/useQueries";
 
-const ADMIN_PIN = "ADMIN2024";
+const DEFAULT_PIN = "ADMIN2024";
+const PIN_STORAGE_KEY = "admin_pin";
+
+function getStoredPin(): string {
+  return localStorage.getItem(PIN_STORAGE_KEY) ?? DEFAULT_PIN;
+}
 
 const STATUS_CONFIG: Record<
   TicketStatus,
@@ -89,10 +104,11 @@ function formatDate(ts: bigint) {
 function PinGate({ onUnlock }: { onUnlock: () => void }) {
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
+  const [showPin, setShowPin] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (pin === ADMIN_PIN) {
+    if (pin === getStoredPin()) {
       sessionStorage.setItem("admin_auth", "1");
       onUnlock();
     } else {
@@ -122,19 +138,29 @@ function PinGate({ onUnlock }: { onUnlock: () => void }) {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="pin">Admin PIN</Label>
-                <Input
-                  id="pin"
-                  type="password"
-                  placeholder="Enter PIN"
-                  value={pin}
-                  onChange={(e) => {
-                    setPin(e.target.value);
-                    setError("");
-                  }}
-                  className={`rounded-xl h-12 text-center tracking-widest ${error ? "border-destructive" : ""}`}
-                  data-ocid="admin.pin_input"
-                  autoComplete="off"
-                />
+                <div className="relative">
+                  <Input
+                    id="pin"
+                    type={showPin ? "text" : "password"}
+                    placeholder="Enter PIN"
+                    value={pin}
+                    onChange={(e) => {
+                      setPin(e.target.value);
+                      setError("");
+                    }}
+                    className={`rounded-xl h-12 pr-12 text-center tracking-widest ${error ? "border-destructive" : ""}`}
+                    data-ocid="admin.pin_input"
+                    autoComplete="off"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPin((p) => !p)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    data-ocid="admin.pin_toggle"
+                  >
+                    {showPin ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
                 {error && (
                   <p
                     className="text-xs text-destructive"
@@ -537,6 +563,180 @@ function StaffPanel() {
   );
 }
 
+function SettingsPanel() {
+  const [currentPin, setCurrentPin] = useState("");
+  const [newPin, setNewPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [success, setSuccess] = useState(false);
+
+  const handleChangePin = (e: React.FormEvent) => {
+    e.preventDefault();
+    const errs: Record<string, string> = {};
+    if (!currentPin) errs.currentPin = "Current PIN is required";
+    else if (currentPin !== getStoredPin())
+      errs.currentPin = "Current PIN is incorrect";
+    if (!newPin) errs.newPin = "New PIN is required";
+    else if (newPin.length < 4)
+      errs.newPin = "PIN must be at least 4 characters";
+    if (!confirmPin) errs.confirmPin = "Please confirm your new PIN";
+    else if (newPin !== confirmPin) errs.confirmPin = "PINs do not match";
+    setErrors(errs);
+    if (Object.keys(errs).length > 0) return;
+
+    localStorage.setItem(PIN_STORAGE_KEY, newPin);
+    setSuccess(true);
+    setCurrentPin("");
+    setNewPin("");
+    setConfirmPin("");
+    toast.success("Admin PIN changed successfully!");
+    setTimeout(() => setSuccess(false), 4000);
+  };
+
+  return (
+    <div className="max-w-md">
+      <Card className="rounded-2xl border-0 shadow-card">
+        <CardHeader className="pb-4">
+          <CardTitle className="font-display text-lg flex items-center gap-2">
+            <KeyRound size={18} className="text-primary" />
+            Change Admin PIN
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Update your admin dashboard access PIN. Make sure to remember it.
+          </p>
+        </CardHeader>
+        <CardContent>
+          {success && (
+            <div
+              className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl p-4 mb-5"
+              data-ocid="admin.pin_change_success_state"
+            >
+              <CheckCircle size={18} className="text-green-600 shrink-0" />
+              <p className="text-sm text-green-800 font-medium">
+                PIN updated successfully!
+              </p>
+            </div>
+          )}
+          <form onSubmit={handleChangePin} className="space-y-5">
+            {/* Current PIN */}
+            <div className="space-y-1.5">
+              <Label>Current PIN</Label>
+              <div className="relative">
+                <Input
+                  type={showCurrent ? "text" : "password"}
+                  placeholder="Enter current PIN"
+                  value={currentPin}
+                  onChange={(e) => {
+                    setCurrentPin(e.target.value);
+                    setErrors({ ...errors, currentPin: "" });
+                  }}
+                  className={`rounded-xl h-12 pr-12 tracking-widest ${errors.currentPin ? "border-destructive" : ""}`}
+                  data-ocid="admin.current_pin_input"
+                  autoComplete="off"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowCurrent((p) => !p)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showCurrent ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              {errors.currentPin && (
+                <p
+                  className="text-xs text-destructive"
+                  data-ocid="admin.current_pin_error"
+                >
+                  {errors.currentPin}
+                </p>
+              )}
+            </div>
+
+            {/* New PIN */}
+            <div className="space-y-1.5">
+              <Label>New PIN</Label>
+              <div className="relative">
+                <Input
+                  type={showNew ? "text" : "password"}
+                  placeholder="Enter new PIN (min 4 chars)"
+                  value={newPin}
+                  onChange={(e) => {
+                    setNewPin(e.target.value);
+                    setErrors({ ...errors, newPin: "" });
+                  }}
+                  className={`rounded-xl h-12 pr-12 tracking-widest ${errors.newPin ? "border-destructive" : ""}`}
+                  data-ocid="admin.new_pin_input"
+                  autoComplete="off"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNew((p) => !p)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showNew ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              {errors.newPin && (
+                <p
+                  className="text-xs text-destructive"
+                  data-ocid="admin.new_pin_error"
+                >
+                  {errors.newPin}
+                </p>
+              )}
+            </div>
+
+            {/* Confirm PIN */}
+            <div className="space-y-1.5">
+              <Label>Confirm New PIN</Label>
+              <div className="relative">
+                <Input
+                  type={showConfirm ? "text" : "password"}
+                  placeholder="Confirm new PIN"
+                  value={confirmPin}
+                  onChange={(e) => {
+                    setConfirmPin(e.target.value);
+                    setErrors({ ...errors, confirmPin: "" });
+                  }}
+                  className={`rounded-xl h-12 pr-12 tracking-widest ${errors.confirmPin ? "border-destructive" : ""}`}
+                  data-ocid="admin.confirm_pin_input"
+                  autoComplete="off"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirm((p) => !p)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              {errors.confirmPin && (
+                <p
+                  className="text-xs text-destructive"
+                  data-ocid="admin.confirm_pin_error"
+                >
+                  {errors.confirmPin}
+                </p>
+              )}
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full h-12 rounded-xl bg-primary text-primary-foreground font-semibold"
+              data-ocid="admin.change_pin_button"
+            >
+              Update PIN
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const [unlocked, setUnlocked] = useState(
     () => sessionStorage.getItem("admin_auth") === "1",
@@ -568,6 +768,7 @@ export default function AdminPage() {
                 sessionStorage.removeItem("admin_auth");
                 setUnlocked(false);
               }}
+              data-ocid="admin.lock_button"
             >
               <Lock size={14} className="mr-2" />
               Lock
@@ -590,6 +791,14 @@ export default function AdminPage() {
               >
                 Staff
               </TabsTrigger>
+              <TabsTrigger
+                value="settings"
+                className="rounded-xl px-6 py-2.5 font-medium data-[state=active]:bg-background data-[state=active]:shadow-soft"
+                data-ocid="admin.settings_tab"
+              >
+                <Settings size={14} className="mr-2" />
+                Settings
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="tickets">
@@ -598,6 +807,10 @@ export default function AdminPage() {
 
             <TabsContent value="staff">
               <StaffPanel />
+            </TabsContent>
+
+            <TabsContent value="settings">
+              <SettingsPanel />
             </TabsContent>
           </Tabs>
         </motion.div>
