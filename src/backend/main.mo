@@ -1,10 +1,8 @@
 import Iter "mo:core/Iter";
 import Map "mo:core/Map";
 import Order "mo:core/Order";
-import Set "mo:core/Set";
 import Time "mo:core/Time";
 import Nat "mo:core/Nat";
-import List "mo:core/List";
 import Array "mo:core/Array";
 import Text "mo:core/Text";
 import Int "mo:core/Int";
@@ -76,7 +74,7 @@ actor {
     message : Text,
     attachmentUrl : ?Storage.ExternalBlob,
   ) : async Text {
-    let ticketId = await generateTicketId();
+    let ticketId = generateTicketId();
 
     let ticket : SupportTicket = {
       ticketId;
@@ -178,14 +176,10 @@ actor {
     filtered.toArray().sort();
   };
 
-  func getCurrentTimestamp() : Int {
-    Time.now();
-  };
-
-  func generateTicketId() : async Text {
+  func generateTicketId() : Text {
     let now = Time.now();
-    let currentTimestamp = now / 1_000_000; // Convert to seconds
-    let currentDay = currentTimestamp / 86400; // Divide by number of seconds in a day
+    let currentTimestamp = now / 1_000_000_000; // Convert nanoseconds to seconds
+    let currentDay = currentTimestamp / 86400; // Days since epoch
 
     let dailyKey = currentDay.toText();
 
@@ -200,6 +194,6 @@ actor {
       };
     };
 
-    "VLSW" # serial.toText() # dailyKey;
+    "VLSW" # serial.toText() # "-" # dailyKey;
   };
 };

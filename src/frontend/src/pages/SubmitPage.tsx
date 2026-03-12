@@ -14,6 +14,7 @@ import { CheckCircle, Copy, Loader2, Paperclip, X } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useActor } from "../hooks/useActor";
 import { IssueType, useSubmitTicket } from "../hooks/useQueries";
 
 const WHATSAPP_NUMBER = "919262269107";
@@ -53,7 +54,10 @@ export default function SubmitPage() {
   const [ticketId, setTicketId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
+  const { actor, isFetching: actorLoading } = useActor();
   const { mutate: submitTicket, isPending } = useSubmitTicket();
+
+  const isActorReady = !!actor && !actorLoading;
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -89,7 +93,14 @@ export default function SubmitPage() {
           toast.success("Support ticket submitted successfully!");
         },
         onError: (err) => {
-          toast.error("Failed to submit ticket. Please try again.");
+          const msg = err instanceof Error ? err.message : "";
+          if (msg.includes("Not connected")) {
+            toast.error(
+              "Still connecting to server, please wait a moment and try again.",
+            );
+          } else {
+            toast.error("Failed to submit ticket. Please try again.");
+          }
           console.error(err);
         },
       },
@@ -444,7 +455,7 @@ export default function SubmitPage() {
 
                 <Button
                   type="submit"
-                  disabled={isPending}
+                  disabled={isPending || !isActorReady}
                   className="w-full h-13 rounded-2xl bg-primary text-primary-foreground text-base font-semibold shadow-soft hover:bg-primary/90 mt-2"
                   data-ocid="submit.submit_button"
                 >
@@ -452,6 +463,11 @@ export default function SubmitPage() {
                     <>
                       <Loader2 size={18} className="mr-2 animate-spin" />{" "}
                       Submitting...
+                    </>
+                  ) : actorLoading || !actor ? (
+                    <>
+                      <Loader2 size={18} className="mr-2 animate-spin" />{" "}
+                      Connecting...
                     </>
                   ) : (
                     "Submit Support Request"
